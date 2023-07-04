@@ -1,0 +1,121 @@
+Which product has the highest price? Only return a single row
+
+select distinct product_name from products where price in (select max(price) from products)
+
+Which customer has made the most orders?
+
+with cte as (
+select c.first_name,c.last_name,c.customer_id,count(order_id) as countorders_percustomer,
+rank() over (order by count(order_id) desc) as rn
+from customers c inner join orders o on c.customer_id= o.customer_id
+group by c.customer_id,c.first_name,c.last_name
+having count(order_id)>=1 
+)
+select * from cte  where rn=1
+
+What’s the total revenue per product?
+
+select o.product_id, sum(o.quantity*p.price) as total_revenue from order_items o inner join products p on o.product_id = p.product_id
+group by o.product_id
+
+Find the day with the highest revenue
+
+with cte as(
+select o.order_id as order_id, sum(o.quantity*p.price) as total_revenue from order_items o inner join products p on o.product_id = p.product_id
+group by o.order_id)
+select top 1 o.order_date,max(c.total_revenue) ,
+rank() over (order by max(c.total_revenue) desc) 
+from orders o inner join cte c on o.order_id = c.order_id
+group by o.order_date
+
+
+Find the first order (by date) for each customer
+
+with cte as (select c.customer_id, min(o.order_date) as first_orderdate from 
+customers c inner join orders o on c.customer_id = o.customer_id
+group by c.customer_id)
+
+select c.first_name,c.last_name,e.first_orderdate 
+from cte e  inner join customers c on e.customer_id=c.customer_id
+
+
+Find the top 3 customers who have ordered the most distinct products
+
+select 
+top 3 c.first_name,c.last_name from
+(
+select c.first_name,c.last_name ,count(distinct p.product_id) as distinct_products,
+rank() over ( order by count(distinct p.product_id ) desc ) as rk
+from customers c inner join orders o on c.customer_id = o.customer_id 
+inner join order_items i on o.order_id= i.order_id
+inner join products p on i.product_id = p.product_id
+group by c.first_name,c.last_name
+) c
+
+Which product has been bought the least in terms of quantity?
+
+select p.product_name,min(quantity) from order_items i inner join products p on i.product_id = p.product_id 
+group by p.product_name
+having min(quantity)=1
+
+What is the median order total
+
+select (count(order_id)/2+1)+(count(order_id)/2+2) as medianordertotal from orders
+
+
+For each order, determine if it was ‘Expensive’ (total over 300), 
+‘Affordable’ (total over 100), or ‘Cheap’.
+
+
+select o.order_id,case when sum(p.price*i.quantity) > 300 then 'expensive'
+           when sum(p.price*i.quantity) > 100 then 'offordable'  
+	       else 'cheap' end  as ordercost
+		   from 
+orders o inner join order_items i on o.order_id=i.order_id
+inner join products p on i.product_id = p.product_id
+group by o.order_id
+
+
+Find customers who have ordered the product with the highest price
+select c.first_name,c.last_name  from 
+customers c inner join 
+orders o on c.customer_id=o.customer_id 
+inner join order_items i on o.order_id=i.order_id
+inner join products p on i.product_id = p.product_id
+where p.price = (select max(price) from products)
+
+
+--------------------------
+
+Find the longest ongoing project for each department
+
+select 
+e.department_id, max(datediff(dd,p.start_date,p.end_date)) as longest_project
+from 
+employees e inner join projects p on e.department_id = p.department_id 
+group by e.department_id
+
+
+Find all employees who are not managers
+
+select * from employees e  where e.id not in (select manager_id from departments)
+
+Find all employees who have been hired after the start of a project in their department.
+
+select e.name from employees e left join projects p on e.department_id = p.department_id
+where e.hire_date> p.start_date
+
+Rank employees within each department based on their hire date (earliest hire gets the highest rank).
+
+select name,hire_date,department_id,rank() over (partition by department_id order by hire_date ) as ran  from employees 
+
+Find the duration between the hire date of each employee and the hire date of the next employee hired in the same department.
+
+select name,hire_date,department_id,rank() over  (partition by department_id order by hire_date ) as ran ,
+datediff(dd,hire_date,lead(hire_date,1) over(partition by department_id order by hire_date)) as differe
+from employees 
+
+
+
+
+
